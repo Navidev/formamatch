@@ -146,36 +146,80 @@ export default function FormicaMatcher() {
     setError(null);
   }, []);
 
+  const isHeicFile = async (file) => {
+    if (file.type === "image/heic" || file.type === "image/heif") return true;
+    if (file.name?.match(/\.(heic|heif)$/i)) return true;
+    try {
+      const buf = await file.slice(0, 12).arrayBuffer();
+      const b = new Uint8Array(buf);
+      // ISOBMFF ftyp box: bytes 4-7 === "ftyp"
+      if (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) {
+        const brand = String.fromCharCode(b[8], b[9], b[10], b[11]).toLowerCase();
+        return brand.startsWith("heic") || brand.startsWith("heix") ||
+               brand.startsWith("mif1") || brand.startsWith("msf1");
+      }
+    } catch (_) {}
+    return false;
+  };
+
+  const loadHeic2any = () => new Promise((resolve, reject) => {
+    if (window.heic2any) { resolve(window.heic2any); return; }
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js";
+    s.onload = () => resolve(window.heic2any);
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+
   const toJpeg = async (file) => {
     const MAX_PX = 2048;
     const drawAndExport = (source, w, h) => new Promise((resolve, reject) => {
+      if (!w || !h) { reject(new Error("invalid dimensions")); return; }
       const scale = Math.min(1, MAX_PX / Math.max(w, h));
       const canvas = document.createElement("canvas");
       canvas.width = Math.round(w * scale);
       canvas.height = Math.round(h * scale);
-      canvas.getContext("2d").drawImage(source, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob(blob => blob
-        ? resolve(new File([blob], "image.jpg", { type: "image/jpeg" }))
-        : reject(new Error("toBlob failed")),
-      "image/jpeg", 0.92);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { reject(new Error("no canvas context")); return; }
+      ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob => {
+        if (blob && blob.size > 1000)
+          resolve(new File([blob], "image.jpg", { type: "image/jpeg" }));
+        else
+          reject(new Error("toBlob produced empty result"));
+      }, "image/jpeg", 0.92);
     });
 
-    // Try createImageBitmap first (handles HEIC on iOS 15+)
+    // If HEIC: use heic2any JS decoder (canvas can't handle HEIC on iOS)
+    if (await isHeicFile(file)) {
+      try {
+        const heic2any = await loadHeic2any();
+        const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.92 });
+        const resultBlob = Array.isArray(blob) ? blob[0] : blob;
+        return new File([resultBlob], "image.jpg", { type: "image/jpeg" });
+      } catch (_) {
+        throw new Error('פורמט HEIC לא נתמך בדפדפן זה. השתמש בכפתור "צלם" לצילום חדש, או שלח צילום מסך של התמונה.');
+      }
+    }
+
+    // Non-HEIC: try createImageBitmap → canvas
     try {
       const bitmap = await createImageBitmap(file);
-      return await drawAndExport(bitmap, bitmap.width, bitmap.height);
+      const result = await drawAndExport(bitmap, bitmap.width, bitmap.height);
+      bitmap.close?.();
+      return result;
     } catch (_) {}
 
-    // Fallback: img tag with blob URL
-    return new Promise((resolve) => {
+    // Fallback: img tag → canvas
+    return new Promise((resolve, reject) => {
       const img = new Image();
       const url = URL.createObjectURL(file);
       img.onload = async () => {
         URL.revokeObjectURL(url);
         try { resolve(await drawAndExport(img, img.naturalWidth, img.naturalHeight)); }
-        catch { resolve(file); }
+        catch (e) { reject(e); }
       };
-      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("image failed to load")); };
       img.src = url;
     });
   };
@@ -189,12 +233,8 @@ export default function FormicaMatcher() {
     setResults([]);
 
     try {
-      // Convert to JPEG (handles HEIC from iPhone)
+      // Convert to JPEG (handles HEIC from iPhone via heic2any)
       const jpegFile = await toJpeg(fileObj);
-      const isHeic = !jpegFile.type || jpegFile.type === "image/heic" || jpegFile.type === "image/heif";
-      if (isHeic) {
-        throw new Error("פורמט HEIC אינו נתמך. פתח את התמונה באפליקציית תמונות, צלם צילום מסך ונסה שוב.");
-      }
       const { file_url } = await base44.integrations.Core.UploadFile({ file: jpegFile });
 
       // Stage 1: text-based analysis → 12 candidates
