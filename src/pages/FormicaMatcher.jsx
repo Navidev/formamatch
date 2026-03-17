@@ -173,7 +173,8 @@ export default function FormicaMatcher() {
 
   const toJpeg = async (file) => {
     const MAX_PX = 2048;
-    const drawAndExport = (source, w, h) => new Promise((resolve, reject) => {
+
+    const canvasToJpeg = (source, w, h) => new Promise((resolve, reject) => {
       if (!w || !h) { reject(new Error("invalid dimensions")); return; }
       const scale = Math.min(1, MAX_PX / Math.max(w, h));
       const canvas = document.createElement("canvas");
@@ -186,19 +187,18 @@ export default function FormicaMatcher() {
         if (blob && blob.size > 1000)
           resolve(new File([blob], "image.jpg", { type: "image/jpeg" }));
         else
-          reject(new Error("toBlob produced empty result"));
+          reject(new Error("toBlob empty"));
       }, "image/jpeg", 0.92);
     });
 
-    // Try createImageBitmap first (Safari iOS 16+ supports HEIC natively)
-    try {
-      const bitmap = await createImageBitmap(file);
-      const result = await drawAndExport(bitmap, bitmap.width, bitmap.height);
-      bitmap.close?.();
-      return result;
-    } catch (_) {}
+    const loadImageFromUrl = (url) => new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("img load failed"));
+      img.src = url;
+    });
 
-    // If HEIC and createImageBitmap failed: try heic2any JS decoder
+    // 1. Try heic2any first for gallery images (most reliable for HEIC on iOS)
     if (await isHeicFile(file)) {
       try {
         const heic2any = await loadHeic2any();
@@ -208,18 +208,23 @@ export default function FormicaMatcher() {
       } catch (_) {}
     }
 
-    // Fallback: img tag → canvas
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = async () => {
-        URL.revokeObjectURL(url);
-        try { resolve(await drawAndExport(img, img.naturalWidth, img.naturalHeight)); }
-        catch (e) { reject(e); }
-      };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("לא ניתן לטעון את התמונה. נסה לצלם ישירות עם כפתור 'צלם'.")); };
-      img.src = url;
+    // 2. Try createImageBitmap → canvas
+    try {
+      const bitmap = await createImageBitmap(file);
+      const result = await canvasToJpeg(bitmap, bitmap.width, bitmap.height);
+      bitmap.close?.();
+      return result;
+    } catch (_) {}
+
+    // 3. FileReader → img tag → canvas (works for any format iOS can display)
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
     });
+    const img = await loadImageFromUrl(dataUrl);
+    return canvasToJpeg(img, img.naturalWidth, img.naturalHeight);
   };
 
   const handleAnalyze = async () => {
