@@ -159,22 +159,10 @@ export default function FormicaMatcher() {
       if (!ctx) { reject(new Error("no canvas context")); return; }
       ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
       canvas.toBlob(blob => {
-        if (blob && blob.size > 100) {
-          // Force type to image/jpeg regardless of what toBlob returns
+        if (blob && blob.size > 1000)
           resolve(new File([blob], "image.jpg", { type: "image/jpeg" }));
-        } else {
-          // toBlob failed — use dataURL fallback
-          try {
-            const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
-            const arr = dataUrl.split(",");
-            const bstr = atob(arr[1]);
-            const u8arr = new Uint8Array(bstr.length);
-            for (let i = 0; i < bstr.length; i++) u8arr[i] = bstr.charCodeAt(i);
-            resolve(new File([u8arr], "image.jpg", { type: "image/jpeg" }));
-          } catch (e) {
-            reject(new Error("toBlob and dataURL both failed"));
-          }
-        }
+        else
+          reject(new Error("toBlob empty"));
       }, "image/jpeg", 0.92);
     });
 
@@ -203,9 +191,12 @@ export default function FormicaMatcher() {
     setResults([]);
 
     try {
-      // Convert to JPEG
+      // Convert to JPEG (handles HEIC from iPhone via canvas)
       let jpegFile = await toJpeg(fileObj);
-      jpegFile = new File([jpegFile], "image.jpg", { type: "image/jpeg" });
+      // iOS Safari sometimes returns blob with empty type — force it
+      if (!jpegFile.type || jpegFile.type === "") {
+        jpegFile = new File([jpegFile], "image.jpg", { type: "image/jpeg" });
+      }
       const { file_url } = await base44.integrations.Core.UploadFile({ file: jpegFile });
 
       // Stage 1: text-based analysis → 12 candidates
