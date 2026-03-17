@@ -191,40 +191,20 @@ export default function FormicaMatcher() {
       }, "image/jpeg", 0.92);
     });
 
-    const loadImageFromUrl = (url) => new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error("img load failed"));
-      img.src = url;
-    });
-
-    // 1. Try heic2any first for gallery images (most reliable for HEIC on iOS)
-    if (await isHeicFile(file)) {
-      try {
-        const heic2any = await loadHeic2any();
-        const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.92 });
-        const resultBlob = Array.isArray(blob) ? blob[0] : blob;
-        return new File([resultBlob], "image.jpg", { type: "image/jpeg" });
-      } catch (_) {}
-    }
-
-    // 2. Try createImageBitmap → canvas
-    try {
-      const bitmap = await createImageBitmap(file);
-      const result = await canvasToJpeg(bitmap, bitmap.width, bitmap.height);
-      bitmap.close?.();
-      return result;
-    } catch (_) {}
-
-    // 3. FileReader → img tag → canvas (works for any format iOS can display)
-    const dataUrl = await new Promise((resolve, reject) => {
+    // Always use FileReader → img → canvas (handles HEIC, JPEG, PNG on iOS)
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = e => resolve(e.target.result);
-      reader.onerror = reject;
+      reader.onerror = () => reject(new Error("לא ניתן לקרוא את הקובץ"));
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onerror = () => reject(new Error("לא ניתן לטעון את התמונה"));
+        img.onload = () => {
+          canvasToJpeg(img, img.naturalWidth, img.naturalHeight).then(resolve).catch(reject);
+        };
+        img.src = e.target.result;
+      };
       reader.readAsDataURL(file);
     });
-    const img = await loadImageFromUrl(dataUrl);
-    return canvasToJpeg(img, img.naturalWidth, img.naturalHeight);
   };
 
   const handleAnalyze = async () => {
