@@ -146,43 +146,40 @@ export default function FormicaMatcher() {
     setError(null);
   }, []);
 
-  const toJpeg = async (file) => {
-    const MAX_PX = 2048;
+  const toJpeg = (file) => new Promise((resolve, reject) => {
+    const isHeic = /heic|heif/i.test(file.name || "") || /heic|heif/i.test(file.type || "");
+    const isJpegOrPng = /jpeg|jpg|png|webp/i.test(file.type || "") || /\.(jpe?g|png|webp)$/i.test(file.name || "");
 
-    const canvasToJpeg = (source, w, h) => new Promise((resolve, reject) => {
-      if (!w || !h) { reject(new Error("invalid dimensions")); return; }
-      const scale = Math.min(1, MAX_PX / Math.max(w, h));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.round(w * scale);
-      canvas.height = Math.round(h * scale);
-      const ctx = canvas.getContext("2d");
-      if (!ctx) { reject(new Error("no canvas context")); return; }
-      ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
-      const arr = dataUrl.split(",");
-      const bstr = atob(arr[1]);
-      const u8arr = new Uint8Array(bstr.length);
-      for (let i = 0; i < bstr.length; i++) u8arr[i] = bstr.charCodeAt(i);
-      const jpegFile = new File([u8arr], "image.jpg", { type: "image/jpeg" });
-      if (jpegFile.size > 100) resolve(jpegFile);
-      else reject(new Error("toDataURL empty"));
-    });
+    // If it's a standard image format, just force the type and return directly
+    if (isJpegOrPng && !isHeic) {
+      resolve(new File([file], "image.jpg", { type: "image/jpeg" }));
+      return;
+    }
 
-    // Always use FileReader → img → canvas (handles HEIC, JPEG, PNG on iOS)
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => reject(new Error("לא ניתן לקרוא את הקובץ"));
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onerror = () => reject(new Error("לא ניתן לטעון את התמונה"));
-        img.onload = () => {
-          canvasToJpeg(img, img.naturalWidth, img.naturalHeight).then(resolve).catch(reject);
-        };
-        img.src = e.target.result;
+    // For HEIC or unknown types, use canvas conversion
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("לא ניתן לקרוא את הקובץ"));
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("לא ניתן לטעון את התמונה"));
+      img.onload = () => {
+        const MAX_PX = 2048;
+        const scale = Math.min(1, MAX_PX / Math.max(img.naturalWidth, img.naturalHeight));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.naturalWidth * scale);
+        canvas.height = Math.round(img.naturalHeight * scale);
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+        const bstr = atob(dataUrl.split(",")[1]);
+        const u8arr = new Uint8Array(bstr.length);
+        for (let i = 0; i < bstr.length; i++) u8arr[i] = bstr.charCodeAt(i);
+        resolve(new File([u8arr], "image.jpg", { type: "image/jpeg" }));
       };
-      reader.readAsDataURL(file);
-    });
-  };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
 
   const handleAnalyze = async () => {
     if (!fileObj) return;
