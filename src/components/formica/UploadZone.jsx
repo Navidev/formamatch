@@ -8,7 +8,9 @@ export default function UploadZone({ image, onFileSelect, onAnalyze, onReset, lo
 
   const processFile = useCallback((file) => {
     console.log("processFile called, file:", file?.name, "type:", file?.type);
-    if (!file || !file.type.startsWith("image/")) return;
+    if (!file) return;
+    const isImage = file.type.startsWith("image/") || file.name.match(/\.(jpe?g|png|webp|heic|heif)$/i);
+    if (!isImage) return;
     onFileSelect(file);
   }, [onFileSelect]);
 
@@ -38,7 +40,7 @@ export default function UploadZone({ image, onFileSelect, onAnalyze, onReset, lo
       <input
         ref={fileRef}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp"
         className="hidden"
         onChange={e => processFile(e.target.files[0])}
       />
