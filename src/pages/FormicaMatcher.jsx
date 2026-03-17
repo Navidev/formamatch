@@ -146,31 +146,6 @@ export default function FormicaMatcher() {
     setError(null);
   }, []);
 
-  const isHeicFile = async (file) => {
-    if (file.type === "image/heic" || file.type === "image/heif") return true;
-    if (file.name?.match(/\.(heic|heif)$/i)) return true;
-    try {
-      const buf = await file.slice(0, 12).arrayBuffer();
-      const b = new Uint8Array(buf);
-      // ISOBMFF ftyp box: bytes 4-7 === "ftyp"
-      if (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) {
-        const brand = String.fromCharCode(b[8], b[9], b[10], b[11]).toLowerCase();
-        return brand.startsWith("heic") || brand.startsWith("heix") ||
-               brand.startsWith("mif1") || brand.startsWith("msf1");
-      }
-    } catch (_) {}
-    return false;
-  };
-
-  const loadHeic2any = () => new Promise((resolve, reject) => {
-    if (window.heic2any) { resolve(window.heic2any); return; }
-    const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js";
-    s.onload = () => resolve(window.heic2any);
-    s.onerror = reject;
-    document.head.appendChild(s);
-  });
-
   const toJpeg = async (file) => {
     const MAX_PX = 2048;
 
