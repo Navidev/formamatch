@@ -41,7 +41,7 @@ export default function UploadZone({ image, onFileSelect, onAnalyze, onReset, lo
       <input
         ref={fileRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
         className="hidden"
         onChange={e => processFile(e.target.files[0])}
       />
