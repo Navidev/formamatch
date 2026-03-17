@@ -81,7 +81,7 @@ export default function UploadZone({ image, onFileSelect, onAnalyze, onReset, lo
                 className="flex-1 flex flex-col items-center gap-1.5 px-4 py-3 rounded-xl bg-stone-800/50 border border-stone-700/30 text-stone-300 hover:bg-stone-800 transition-all text-sm font-medium"
               >
                 <FolderOpen className="w-5 h-5" />
-                <span>בחר קובץ</span>
+                <span>גלריה / קובץ</span>
               </button>
             </div>
 
