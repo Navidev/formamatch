@@ -66,6 +66,7 @@ export default function FormicaMatcher() {
   }, []);
 
   const runLLM = async (promptText, fileUrl = null) => {
+    console.log("runLLM called, fileUrl:", fileUrl ? "exists" : "null", "promptText length:", promptText?.length);
     setLoading(true);
     setError(null);
     try {
