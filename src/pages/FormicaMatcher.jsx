@@ -68,51 +68,60 @@ export default function FormicaMatcher() {
   const runLLM = async (promptText, fileUrl = null) => {
     setLoading(true);
     setError(null);
-
-    const params = {
-      prompt: promptText,
-      model: "claude_sonnet_4_6",
-      response_json_schema: {
-        type: "object",
-        properties: {
-          description: { type: "string" },
-          color: { type: "string" },
-          tone: { type: "string", enum: ["bright", "medium", "dark"] },
-          category: { type: "string", enum: ["solid", "wood", "stone", "metal", "pattern"] },
-          warmth: { type: "string", enum: ["warm", "cool", "neutral"] },
-          matches: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                code: { type: "string" },
-                reason: { type: "string" },
-                similarity: { type: "number" },
+    try {
+      const params = {
+        prompt: promptText,
+        model: "claude_sonnet_4_6",
+        response_json_schema: {
+          type: "object",
+          properties: {
+            description: { type: "string" },
+            color: { type: "string" },
+            tone: { type: "string", enum: ["bright", "medium", "dark"] },
+            category: { type: "string", enum: ["solid", "wood", "stone", "metal", "pattern"] },
+            warmth: { type: "string", enum: ["warm", "cool", "neutral"] },
+            matches: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  code: { type: "string" },
+                  reason: { type: "string" },
+                  similarity: { type: "number" },
+                },
+                required: ["code", "reason", "similarity"],
               },
-              required: ["code", "reason", "similarity"],
             },
           },
+          required: ["description", "color", "tone", "category", "warmth", "matches"],
         },
-        required: ["description", "color", "tone", "category", "warmth", "matches"],
-      },
-    };
-    if (fileUrl) params.file_urls = [fileUrl];
+      };
+      if (fileUrl) params.file_urls = [fileUrl];
 
-    const parsed = await base44.integrations.Core.InvokeLLM(params);
-    setAnalysis(parsed);
+      const parsed = await base44.integrations.Core.InvokeLLM(params);
+      setAnalysis(parsed);
 
-    const matched = (parsed.matches || []).map(m => {
-      const entry = FORMICA_CATALOG.find(c => c.code === m.code);
-      return entry ? { ...entry, reason: m.reason, similarity: m.similarity } : null;
-    }).filter(Boolean);
-    setResults(matched);
-    setLoading(false);
+      const matched = (parsed.matches || []).map(m => {
+        const entry = FORMICA_CATALOG.find(c => c.code === m.code);
+        return entry ? { ...entry, reason: m.reason, similarity: m.similarity } : null;
+      }).filter(Boolean);
+      setResults(matched);
+    } catch (err) {
+      setError("שגיאה: " + (err?.message || "אנא נסה שוב"));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAnalyze = async () => {
     if (!fileObj) return;
-    const { file_url } = await base44.integrations.Core.UploadFile({ file: fileObj });
-    await runLLM(SYSTEM_PROMPT + "\n\nנתח את התמונה ומצא את ההתאמות הכי מדויקות מהרשימה. החזר JSON בלבד.", file_url);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file: fileObj });
+      await runLLM(SYSTEM_PROMPT + "\n\nנתח את התמונה ומצא את ההתאמות הכי מדויקות מהרשימה. החזר JSON בלבד.", file_url);
+    } catch (err) {
+      setError("שגיאה בהעלאת התמונה: " + (err?.message || "אנא נסה שוב"));
+      setLoading(false);
+    }
   };
 
   const handleTextSearch = async (query) => {
