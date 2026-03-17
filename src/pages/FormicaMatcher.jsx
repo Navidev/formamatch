@@ -190,12 +190,7 @@ export default function FormicaMatcher() {
     setResults([]);
 
     try {
-      // Convert to JPEG (handles HEIC from iPhone via canvas)
-      let jpegFile = await toJpeg(fileObj);
-      // iOS Safari sometimes returns blob with empty type — force it
-      if (!jpegFile.type || jpegFile.type === "") {
-        jpegFile = new File([jpegFile], "image.jpg", { type: "image/jpeg" });
-      }
+      const jpegFile = await toJpeg(fileObj);
       const { file_url } = await base44.integrations.Core.UploadFile({ file: jpegFile });
 
       // Stage 1: text-based analysis → 12 candidates
