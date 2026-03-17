@@ -9,16 +9,16 @@ import ResultsGrid from "@/components/formica/ResultsGrid";
 import LoadingState from "@/components/formica/LoadingState";
 import TextSearch from "@/components/formica/TextSearch";
 
-const SYSTEM_PROMPT = `אתה מומחה להתאמת פורמייקה עם ניסיון של 20 שנה.
+const STAGE1_PROMPT = `אתה מומחה להתאמת פורמייקה עם ניסיון של 20 שנה.
 המשתמש מעלה תמונה של פורמייקה או חומר שהוא רוצה להתאים.
 
 להלן רשימת כל הפורמייקות הזמינות בפורמט: קוד|תיאור
 ${CATALOG_FOR_PROMPT}
 
 המשימה שלך:
-1. נתח לעומק את התמונה — צבע, גוון, טקסטורה, חום/קור, בהירות
-2. השווה ויזואלית לכל הפורמייקות ברשימה
-3. בחר את 6 הפורמייקות הכי קרובות ויזואלית
+1. נתח לעומק את התמונה — קטגוריה (עץ/אבן/מתכת/אחיד/דוגמה), צבע, גוון, טקסטורה, חום/קור, בהירות
+2. זהה את הקטגוריה הויזואלית המדויקת: **אם רואים עץ — בחר רק עץ. אם אבן — רק אבן. אם אחיד — רק אחיד.**
+3. בחר **12 מועמדים** הכי קרובים מהרשימה — לפי קטגוריה קודם, אחר כך לפי צבע וגוון
 
 החזר JSON בלבד (ללא markdown):
 {
@@ -28,108 +28,24 @@ ${CATALOG_FOR_PROMPT}
   "category": "solid/wood/stone/metal/pattern",
   "warmth": "warm/cool/neutral",
   "matches": [
-    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 95},
+    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 90},
     {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 88},
+    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 85},
     {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 82},
+    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 80},
+    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 78},
     {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 75},
+    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 73},
     {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 70},
-    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 65}
+    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 68},
+    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 65},
+    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 62}
   ]
 }
 
-חשוב: השתמש אך ורק בקודים שמופיעים ברשימה. similarity הוא אחוז דמיון 0-100.`;
+חשוב: השתמש אך ורק בקודים שמופיעים ברשימה. החזר בדיוק 12 מועמדים.`;
 
-export default function FormicaMatcher() {
-  const [image, setImage] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [analysis, setAnalysis] = useState(null);
-  const [results, setResults] = useState([]);
-  const [error, setError] = useState(null);
-  const [fileObj, setFileObj] = useState(null);
-  const [mode, setMode] = useState("image"); // "image" | "text"
-
-  const handleFileSelect = useCallback((file) => {
-    const url = URL.createObjectURL(file);
-    setImage(url);
-    setFileObj(file);
-    setResults([]);
-    setAnalysis(null);
-    setError(null);
-  }, []);
-
-  const handleReset = useCallback(() => {
-    setImage(null);
-    setFileObj(null);
-    setResults([]);
-    setAnalysis(null);
-    setError(null);
-  }, []);
-
-  const runLLM = async (promptText, fileUrl = null) => {
-    console.log("runLLM called, fileUrl:", fileUrl ? "exists" : "null", "promptText length:", promptText?.length);
-    setLoading(true);
-    setError(null);
-    try {
-      const params = {
-        prompt: promptText,
-        model: "claude_sonnet_4_6",
-        response_json_schema: {
-          type: "object",
-          properties: {
-            description: { type: "string" },
-            color: { type: "string" },
-            tone: { type: "string", enum: ["bright", "medium", "dark"] },
-            category: { type: "string", enum: ["solid", "wood", "stone", "metal", "pattern"] },
-            warmth: { type: "string", enum: ["warm", "cool", "neutral"] },
-            matches: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  code: { type: "string" },
-                  reason: { type: "string" },
-                  similarity: { type: "number" },
-                },
-                required: ["code", "reason", "similarity"],
-              },
-            },
-          },
-          required: ["description", "color", "tone", "category", "warmth", "matches"],
-        },
-      };
-      if (fileUrl) params.file_urls = [fileUrl];
-
-      const raw = await base44.integrations.Core.InvokeLLM(params);
-      console.log("InvokeLLM result:", JSON.stringify(raw).substring(0, 500));
-      const parsed = raw?.response || raw;
-      setAnalysis(parsed);
-
-      const matched = (parsed.matches || []).map(m => {
-        const entry = FORMICA_CATALOG.find(c => c.code === m.code);
-        return entry ? { ...entry, reason: m.reason, similarity: m.similarity } : null;
-      }).filter(Boolean);
-      setResults(matched);
-    } catch (err) {
-      console.log("InvokeLLM error:", err?.message, err);
-      setError("שגיאה: " + (err?.message || "אנא נסה שוב"));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAnalyze = async () => {
-    if (!fileObj) return;
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file: fileObj });
-      await runLLM(SYSTEM_PROMPT + "\n\nנתח את התמונה ומצא את ההתאמות הכי מדויקות מהרשימה. החזר JSON בלבד.", file_url);
-    } catch (err) {
-      setError("שגיאה בהעלאת התמונה: " + (err?.message || "אנא נסה שוב"));
-      setLoading(false);
-    }
-  };
-
-  const handleTextSearch = async (query) => {
-    const textPrompt = `אתה מומחה להתאמת פורמייקה.
+const TEXT_SEARCH_PROMPT = (query) => `אתה מומחה להתאמת פורמייקה.
 
 להלן רשימת כל הפורמייקות הזמינות בפורמט: קוד|תיאור
 ${CATALOG_FOR_PROMPT}
@@ -160,9 +76,192 @@ ${CATALOG_FOR_PROMPT}
 
 חשוב: השתמש אך ורק בקודים שמופיעים ברשימה.`;
 
+const RESPONSE_SCHEMA_FULL = {
+  type: "object",
+  properties: {
+    description: { type: "string" },
+    color: { type: "string" },
+    tone: { type: "string", enum: ["bright", "medium", "dark"] },
+    category: { type: "string", enum: ["solid", "wood", "stone", "metal", "pattern"] },
+    warmth: { type: "string", enum: ["warm", "cool", "neutral"] },
+    matches: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          code: { type: "string" },
+          reason: { type: "string" },
+          similarity: { type: "number" },
+        },
+        required: ["code", "reason", "similarity"],
+      },
+    },
+  },
+  required: ["description", "color", "tone", "category", "warmth", "matches"],
+};
+
+const RESPONSE_SCHEMA_MATCHES_ONLY = {
+  type: "object",
+  properties: {
+    matches: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          code: { type: "string" },
+          reason: { type: "string" },
+          similarity: { type: "number" },
+        },
+        required: ["code", "reason", "similarity"],
+      },
+    },
+  },
+  required: ["matches"],
+};
+
+export default function FormicaMatcher() {
+  const [image, setImage] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(1);
+  const [analysis, setAnalysis] = useState(null);
+  const [results, setResults] = useState([]);
+  const [error, setError] = useState(null);
+  const [fileObj, setFileObj] = useState(null);
+  const [mode, setMode] = useState("image");
+
+  const handleFileSelect = useCallback((file) => {
+    const url = URL.createObjectURL(file);
+    setImage(url);
+    setFileObj(file);
+    setResults([]);
+    setAnalysis(null);
+    setError(null);
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setImage(null);
+    setFileObj(null);
+    setResults([]);
+    setAnalysis(null);
+    setError(null);
+  }, []);
+
+  const handleAnalyze = async () => {
+    if (!fileObj) return;
+    setLoading(true);
+    setLoadingStep(1);
+    setError(null);
     setAnalysis(null);
     setResults([]);
-    await runLLM(textPrompt);
+
+    try {
+      // Upload image once
+      const { file_url } = await base44.integrations.Core.UploadFile({ file: fileObj });
+
+      // Stage 1: text-based analysis → 12 candidates
+      console.log("Stage 1: analyzing image text...");
+      const stage1Raw = await base44.integrations.Core.InvokeLLM({
+        prompt: STAGE1_PROMPT + "\n\nנתח את התמונה ומצא 12 מועמדים. החזר JSON בלבד.",
+        model: "claude_sonnet_4_6",
+        file_urls: [file_url],
+        response_json_schema: RESPONSE_SCHEMA_FULL,
+      });
+      const stage1 = stage1Raw?.response || stage1Raw;
+      console.log("Stage 1 result:", JSON.stringify(stage1).substring(0, 300));
+
+      // Map 12 candidates to catalog entries
+      const candidates = (stage1.matches || [])
+        .slice(0, 12)
+        .map(m => FORMICA_CATALOG.find(c => c.code === m.code))
+        .filter(Boolean);
+
+      if (candidates.length === 0) {
+        throw new Error("לא נמצאו מועמדים בשלב 1");
+      }
+
+      // Stage 2: visual comparison — original image + catalog images
+      setLoadingStep(2);
+      console.log("Stage 2: visual comparison with", candidates.length, "candidates...");
+
+      const candidateList = candidates
+        .map((c, i) => `תמונה ${i + 2}: קוד ${c.code}`)
+        .join("\n");
+
+      const stage2Prompt = `אתה מומחה להתאמת פורמייקה עם עין ויזואלית מדויקת.
+
+התמונה הראשונה היא הפורמייקה שהנגר מחפש להתאים.
+התמונות הבאות הן מועמדות מהקטלוג:
+${candidateList}
+
+המשימה: השווה ויזואלית כל מועמדת לתמונה הראשונה.
+בחר בדיוק 6 הדומות ביותר — לפי צבע, גוון, מרקם וסגנון.
+פסול מועמדות שקטגוריה שלהן שונה (למשל אבן כשהמקור הוא עץ).
+
+החזר JSON בלבד:
+{
+  "matches": [
+    {"code": "XXXX XX", "reason": "סיבה ויזואלית קצרה בעברית", "similarity": 95},
+    {"code": "XXXX XX", "reason": "סיבה ויזואלית קצרה בעברית", "similarity": 88},
+    {"code": "XXXX XX", "reason": "סיבה ויזואלית קצרה בעברית", "similarity": 82},
+    {"code": "XXXX XX", "reason": "סיבה ויזואלית קצרה בעברית", "similarity": 75},
+    {"code": "XXXX XX", "reason": "סיבה ויזואלית קצרה בעברית", "similarity": 70},
+    {"code": "XXXX XX", "reason": "סיבה ויזואלית קצרה בעברית", "similarity": 65}
+  ]
+}`;
+
+      const allImageUrls = [file_url, ...candidates.map(c => c.img)];
+      const stage2Raw = await base44.integrations.Core.InvokeLLM({
+        prompt: stage2Prompt,
+        model: "claude_sonnet_4_6",
+        file_urls: allImageUrls,
+        response_json_schema: RESPONSE_SCHEMA_MATCHES_ONLY,
+      });
+      const stage2 = stage2Raw?.response || stage2Raw;
+      console.log("Stage 2 result:", JSON.stringify(stage2).substring(0, 300));
+
+      setAnalysis(stage1);
+
+      const matched = (stage2.matches || [])
+        .map(m => {
+          const entry = FORMICA_CATALOG.find(c => c.code === m.code);
+          return entry ? { ...entry, reason: m.reason, similarity: m.similarity } : null;
+        })
+        .filter(Boolean);
+
+      setResults(matched);
+    } catch (err) {
+      console.log("Error:", err?.message, err);
+      setError("שגיאה: " + (err?.message || "אנא נסה שוב"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTextSearch = async (query) => {
+    setAnalysis(null);
+    setResults([]);
+    setLoading(true);
+    setLoadingStep(1);
+    setError(null);
+    try {
+      const raw = await base44.integrations.Core.InvokeLLM({
+        prompt: TEXT_SEARCH_PROMPT(query),
+        model: "claude_sonnet_4_6",
+        response_json_schema: RESPONSE_SCHEMA_FULL,
+      });
+      const parsed = raw?.response || raw;
+      setAnalysis(parsed);
+
+      const matched = (parsed.matches || []).map(m => {
+        const entry = FORMICA_CATALOG.find(c => c.code === m.code);
+        return entry ? { ...entry, reason: m.reason, similarity: m.similarity } : null;
+      }).filter(Boolean);
+      setResults(matched);
+    } catch (err) {
+      setError("שגיאה: " + (err?.message || "אנא נסה שוב"));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -170,7 +269,6 @@ ${CATALOG_FOR_PROMPT}
       <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;900&display=swap" rel="stylesheet" />
       <style>{`body { font-family: 'Heebo', sans-serif; }`}</style>
 
-      {/* Header */}
       <header className="border-b border-stone-800/60 bg-stone-950/80 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -189,10 +287,7 @@ ${CATALOG_FOR_PROMPT}
         </div>
       </header>
 
-      {/* Main */}
       <main className="max-w-4xl mx-auto px-6 py-10 space-y-6">
-
-        {/* Mode switcher */}
         <div className="flex items-center gap-1 p-1 bg-stone-900/60 border border-stone-800/40 rounded-xl w-fit">
           {[
             { key: "image", label: "העלאת תמונה", icon: "📷" },
@@ -226,7 +321,7 @@ ${CATALOG_FOR_PROMPT}
         )}
 
         <AnimatePresence mode="wait">
-          {loading && <LoadingState key="loading" />}
+          {loading && <LoadingState key="loading" step={loadingStep} />}
         </AnimatePresence>
 
         {error && (
@@ -242,7 +337,6 @@ ${CATALOG_FOR_PROMPT}
         {analysis && !loading && <AnalysisPanel analysis={analysis} />}
         {results.length > 0 && !loading && <ResultsGrid results={results} />}
 
-        {/* Footer */}
         <div className="text-center pt-8 border-t border-stone-900/60">
           <p className="text-[11px] text-stone-700">
             הצבעים המוצגים עשויים להיות שונים מהמוצר בפועל • לאישור סופי מומלץ להזמין דוגמה פיזית
