@@ -245,7 +245,7 @@ ${candidateList}
   ]
 }`;
 
-      const allImageUrls = [file_url, ...candidates.map(c => c.img)];
+      const allImageUrls = [file_url, ...candidates.map(c => c.img).filter(Boolean)];
       const stage2Raw = await base44.integrations.Core.InvokeLLM({
         prompt: stage2Prompt,
         model: "claude_sonnet_4_6",
