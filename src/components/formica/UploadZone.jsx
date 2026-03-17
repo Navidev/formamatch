@@ -1,15 +1,16 @@
 import { useState, useRef, useCallback } from "react";
-import { Upload, Camera, RefreshCw } from "lucide-react";
+import { Upload, Camera, RefreshCw, FolderOpen } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function UploadZone({ image, onFileSelect, onAnalyze, onReset, loading }) {
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef();
+  const cameraRef = useRef();
 
   const processFile = useCallback((file) => {
-    console.log("processFile called, file:", file?.name, "type:", file?.type);
+    console.log("processFile:", file?.name, "type:", file?.type, "size:", file?.size);
     if (!file) return;
-    const isImage = file.type.startsWith("image/") || file.name.match(/\.(jpe?g|png|webp|heic|heif)$/i);
+    const isImage = file.type.startsWith("image/") || file.name?.match(/\.(jpe?g|png|webp|heic|heif)$/i);
     if (!isImage) return;
     onFileSelect(file);
   }, [onFileSelect]);
@@ -25,22 +26,30 @@ export default function UploadZone({ image, onFileSelect, onAnalyze, onReset, lo
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.1 }}
-      className={`relative rounded-2xl border-2 border-dashed transition-all duration-300 cursor-pointer overflow-hidden ${
-        dragOver 
-          ? "border-amber-600/60 bg-amber-950/20" 
-          : image 
-            ? "border-stone-700/40 bg-stone-900/30" 
-            : "border-stone-700/30 bg-stone-900/20 hover:border-amber-700/40 hover:bg-stone-900/40"
+      className={`relative rounded-2xl border-2 border-dashed transition-all duration-300 overflow-hidden ${
+        dragOver
+          ? "border-amber-600/60 bg-amber-950/20"
+          : image
+            ? "border-stone-700/40 bg-stone-900/30"
+            : "border-stone-700/30 bg-stone-900/20"
       }`}
       onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
-      onClick={() => !image && fileRef.current?.click()}
     >
+      {/* Hidden inputs */}
       <input
         ref={fileRef}
         type="file"
         accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={e => processFile(e.target.files[0])}
+      />
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
         className="hidden"
         onChange={e => processFile(e.target.files[0])}
       />
@@ -52,19 +61,32 @@ export default function UploadZone({ image, onFileSelect, onAnalyze, onReset, lo
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="flex flex-col items-center justify-center py-16 px-6"
+            className="flex flex-col items-center justify-center py-12 px-6 gap-5"
           >
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-900/30 to-stone-800/30 border border-stone-700/30 flex items-center justify-center mb-6">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-900/30 to-stone-800/30 border border-stone-700/30 flex items-center justify-center">
               <Camera className="w-8 h-8 text-amber-600/70" />
             </div>
-            <p className="text-lg font-semibold text-stone-200 mb-2">
-              גרור תמונה לכאן או לחץ להעלאה
-            </p>
+
+            {/* Two buttons for mobile */}
+            <div className="flex gap-3 w-full max-w-xs">
+              <button
+                onClick={() => cameraRef.current?.click()}
+                className="flex-1 flex flex-col items-center gap-1.5 px-4 py-3 rounded-xl bg-amber-800/30 border border-amber-700/30 text-amber-300 hover:bg-amber-800/50 transition-all text-sm font-medium"
+              >
+                <Camera className="w-5 h-5" />
+                <span>צלם</span>
+              </button>
+              <button
+                onClick={() => fileRef.current?.click()}
+                className="flex-1 flex flex-col items-center gap-1.5 px-4 py-3 rounded-xl bg-stone-800/50 border border-stone-700/30 text-stone-300 hover:bg-stone-800 transition-all text-sm font-medium"
+              >
+                <FolderOpen className="w-5 h-5" />
+                <span>בחר קובץ</span>
+              </button>
+            </div>
+
             <p className="text-sm text-stone-500 max-w-xs text-center">
-              צלם או העלה תמונה של פורמייקה / דוגמה שאתה מחפש להתאים
-            </p>
-            <p className="text-xs text-stone-600 max-w-xs text-center mt-2">
-              מאייפון? השתמש בצילום מסך או תמונה מה-Files
+              צלם תמונה חדשה, או בחר קובץ JPEG/PNG מה-Files
             </p>
           </motion.div>
         ) : (
@@ -101,7 +123,7 @@ export default function UploadZone({ image, onFileSelect, onAnalyze, onReset, lo
                 {loading ? "מנתח..." : "מצא פורמייקות מתאימות"}
               </button>
               <button
-                onClick={(e) => { e.stopPropagation(); onReset(); fileRef.current?.click(); }}
+                onClick={(e) => { e.stopPropagation(); onReset(); }}
                 className="text-xs text-stone-500 hover:text-amber-500 transition-colors underline underline-offset-2"
               >
                 החלף תמונה
