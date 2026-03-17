@@ -109,6 +109,7 @@ export default function FormicaMatcher() {
       }).filter(Boolean);
       setResults(matched);
     } catch (err) {
+      console.log("InvokeLLM error:", err?.message, err);
       setError("שגיאה: " + (err?.message || "אנא נסה שוב"));
     } finally {
       setLoading(false);
