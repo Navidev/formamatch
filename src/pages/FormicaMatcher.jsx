@@ -146,22 +146,39 @@ export default function FormicaMatcher() {
     setError(null);
   }, []);
 
-  const toJpeg = (file) => new Promise((resolve) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
+  const toJpeg = async (file) => {
+    const MAX_PX = 2048;
+    const drawAndExport = (source, w, h) => new Promise((resolve, reject) => {
+      const scale = Math.min(1, MAX_PX / Math.max(w, h));
       const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      canvas.getContext("2d").drawImage(img, 0, 0);
-      canvas.toBlob((blob) => {
+      canvas.width = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+      canvas.getContext("2d").drawImage(source, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob => blob
+        ? resolve(new File([blob], "image.jpg", { type: "image/jpeg" }))
+        : reject(new Error("toBlob failed")),
+      "image/jpeg", 0.92);
+    });
+
+    // Try createImageBitmap first (handles HEIC on iOS 15+)
+    try {
+      const bitmap = await createImageBitmap(file);
+      return await drawAndExport(bitmap, bitmap.width, bitmap.height);
+    } catch (_) {}
+
+    // Fallback: img tag with blob URL
+    return new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = async () => {
         URL.revokeObjectURL(url);
-        resolve(new File([blob], "image.jpg", { type: "image/jpeg" }));
-      }, "image/jpeg", 0.92);
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
-    img.src = url;
-  });
+        try { resolve(await drawAndExport(img, img.naturalWidth, img.naturalHeight)); }
+        catch { resolve(file); }
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  };
 
   const handleAnalyze = async () => {
     if (!fileObj) return;
