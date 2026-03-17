@@ -184,10 +184,22 @@ export default function FormicaMatcher() {
       if (!ctx) { reject(new Error("no canvas context")); return; }
       ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
       canvas.toBlob(blob => {
-        if (blob && blob.size > 1000)
+        if (blob && blob.size > 100) {
+          // Force type to image/jpeg regardless of what toBlob returns
           resolve(new File([blob], "image.jpg", { type: "image/jpeg" }));
-        else
-          reject(new Error("toBlob empty"));
+        } else {
+          // toBlob failed — use dataURL fallback
+          try {
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+            const arr = dataUrl.split(",");
+            const bstr = atob(arr[1]);
+            const u8arr = new Uint8Array(bstr.length);
+            for (let i = 0; i < bstr.length; i++) u8arr[i] = bstr.charCodeAt(i);
+            resolve(new File([u8arr], "image.jpg", { type: "image/jpeg" }));
+          } catch (e) {
+            reject(new Error("toBlob and dataURL both failed"));
+          }
+        }
       }, "image/jpeg", 0.92);
     });
 
