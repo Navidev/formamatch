@@ -191,6 +191,7 @@ export default function FormicaMatcher() {
 
     try {
       const jpegFile = await toJpeg(fileObj);
+      console.log("jpegFile name:", jpegFile.name, "type:", jpegFile.type, "size:", jpegFile.size);
       const { file_url } = await base44.integrations.Core.UploadFile({ file: jpegFile });
 
       // Stage 1: text-based analysis → 12 candidates
