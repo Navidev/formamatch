@@ -46,7 +46,7 @@ export default function FormicaMatcher() {
   const [results, setResults] = useState([]);
   const [error, setError] = useState(null);
   const [fileObj, setFileObj] = useState(null);
-  const [catalogCount] = useState(FORMICA_CATALOG.length);
+  const [mode, setMode] = useState("image"); // "image" | "text"
 
   const handleFileSelect = useCallback((file) => {
     const url = URL.createObjectURL(file);
