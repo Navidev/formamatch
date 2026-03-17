@@ -205,11 +205,11 @@ export default function FormicaMatcher() {
       const stage1 = stage1Raw?.response || stage1Raw;
       console.log("Stage 1 result:", JSON.stringify(stage1).substring(0, 300));
 
-      // Map 12 candidates to catalog entries
+      // Map 12 candidates to catalog entries (only those with images)
       const candidates = (stage1.matches || [])
         .slice(0, 12)
         .map(m => FORMICA_CATALOG.find(c => c.code === m.code))
-        .filter(Boolean);
+        .filter(c => c && c.img);
 
       if (candidates.length === 0) {
         throw new Error("לא נמצאו מועמדים בשלב 1");
