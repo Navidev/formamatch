@@ -177,14 +177,40 @@ ${CATALOG_FOR_PROMPT}
       </header>
 
       {/* Main */}
-      <main className="max-w-4xl mx-auto px-6 py-10 space-y-8">
-        <UploadZone
-          image={image}
-          onFileSelect={handleFileSelect}
-          onAnalyze={handleAnalyze}
-          onReset={handleReset}
-          loading={loading}
-        />
+      <main className="max-w-4xl mx-auto px-6 py-10 space-y-6">
+
+        {/* Mode switcher */}
+        <div className="flex items-center gap-1 p-1 bg-stone-900/60 border border-stone-800/40 rounded-xl w-fit">
+          {[
+            { key: "image", label: "העלאת תמונה", icon: "📷" },
+            { key: "text", label: "חיפוש טקסטואלי", icon: "🔤" },
+          ].map(({ key, label, icon }) => (
+            <button
+              key={key}
+              onClick={() => { setMode(key); setResults([]); setAnalysis(null); setError(null); }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                mode === key
+                  ? "bg-amber-800/40 text-amber-300 border border-amber-700/30"
+                  : "text-stone-500 hover:text-stone-300"
+              }`}
+            >
+              <span>{icon}</span>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {mode === "image" ? (
+          <UploadZone
+            image={image}
+            onFileSelect={handleFileSelect}
+            onAnalyze={handleAnalyze}
+            onReset={handleReset}
+            loading={loading}
+          />
+        ) : (
+          <TextSearch onSearch={handleTextSearch} loading={loading} />
+        )}
 
         <AnimatePresence mode="wait">
           {loading && <LoadingState key="loading" />}
