@@ -146,6 +146,23 @@ export default function FormicaMatcher() {
     setError(null);
   }, []);
 
+  const toJpeg = (file) => new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext("2d").drawImage(img, 0, 0);
+      canvas.toBlob((blob) => {
+        URL.revokeObjectURL(url);
+        resolve(new File([blob], "image.jpg", { type: "image/jpeg" }));
+      }, "image/jpeg", 0.92);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+
   const handleAnalyze = async () => {
     if (!fileObj) return;
     setLoading(true);
@@ -156,7 +173,8 @@ export default function FormicaMatcher() {
 
     try {
       // Upload image once
-      const { file_url } = await base44.integrations.Core.UploadFile({ file: fileObj });
+      const jpegFile = await toJpeg(fileObj);
+      const { file_url } = await base44.integrations.Core.UploadFile({ file: jpegFile });
 
       // Stage 1: text-based analysis → 12 candidates
       console.log("Stage 1: analyzing image text...");
