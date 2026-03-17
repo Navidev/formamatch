@@ -63,6 +63,9 @@ export default function UploadZone({ image, onFileSelect, onAnalyze, onReset, lo
             <p className="text-sm text-stone-500 max-w-xs text-center">
               צלם או העלה תמונה של פורמייקה / דוגמה שאתה מחפש להתאים
             </p>
+            <p className="text-xs text-stone-600 max-w-xs text-center mt-2">
+              מאייפון? השתמש בצילום מסך או תמונה מה-Files
+            </p>
           </motion.div>
         ) : (
           <motion.div

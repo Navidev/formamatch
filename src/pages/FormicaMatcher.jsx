@@ -189,8 +189,12 @@ export default function FormicaMatcher() {
     setResults([]);
 
     try {
-      // Upload image once
+      // Convert to JPEG (handles HEIC from iPhone)
       const jpegFile = await toJpeg(fileObj);
+      const isHeic = !jpegFile.type || jpegFile.type === "image/heic" || jpegFile.type === "image/heif";
+      if (isHeic) {
+        throw new Error("פורמט HEIC אינו נתמך. פתח את התמונה באפליקציית תמונות, צלם צילום מסך ונסה שוב.");
+      }
       const { file_url } = await base44.integrations.Core.UploadFile({ file: jpegFile });
 
       // Stage 1: text-based analysis → 12 candidates
