@@ -7,6 +7,7 @@ export default function UploadZone({ image, onFileSelect, onAnalyze, onReset, lo
   const fileRef = useRef();
 
   const processFile = useCallback((file) => {
+    console.log("processFile called, file:", file?.name, "type:", file?.type);
     if (!file || !file.type.startsWith("image/")) return;
     onFileSelect(file);
   }, [onFileSelect]);
