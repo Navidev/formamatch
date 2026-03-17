@@ -7,6 +7,7 @@ import UploadZone from "@/components/formica/UploadZone";
 import AnalysisPanel from "@/components/formica/AnalysisPanel";
 import ResultsGrid from "@/components/formica/ResultsGrid";
 import LoadingState from "@/components/formica/LoadingState";
+import TextSearch from "@/components/formica/TextSearch";
 
 const SYSTEM_PROMPT = `אתה מומחה להתאמת פורמייקה עם ניסיון של 20 שנה.
 המשתמש מעלה תמונה של פורמייקה או חומר שהוא רוצה להתאים.
