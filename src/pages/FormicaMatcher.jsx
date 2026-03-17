@@ -100,6 +100,7 @@ export default function FormicaMatcher() {
       if (fileUrl) params.file_urls = [fileUrl];
 
       const parsed = await base44.integrations.Core.InvokeLLM(params);
+      console.log("InvokeLLM result:", JSON.stringify(parsed).substring(0, 500));
       setAnalysis(parsed);
 
       const matched = (parsed.matches || []).map(m => {
