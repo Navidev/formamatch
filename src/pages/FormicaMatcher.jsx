@@ -190,25 +190,23 @@ export default function FormicaMatcher() {
       }, "image/jpeg", 0.92);
     });
 
-    // If HEIC: use heic2any JS decoder (canvas can't handle HEIC on iOS)
-    if (await isHeicFile(file)) {
-      try {
-        const heic2any = await loadHeic2any();
-        const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.92 });
-        const resultBlob = Array.isArray(blob) ? blob[0] : blob;
-        return new File([resultBlob], "image.jpg", { type: "image/jpeg" });
-      } catch (_) {
-        throw new Error('פורמט HEIC לא נתמך בדפדפן זה. השתמש בכפתור "צלם" לצילום חדש, או שלח צילום מסך של התמונה.');
-      }
-    }
-
-    // Non-HEIC: try createImageBitmap → canvas
+    // Try createImageBitmap first (Safari iOS 16+ supports HEIC natively)
     try {
       const bitmap = await createImageBitmap(file);
       const result = await drawAndExport(bitmap, bitmap.width, bitmap.height);
       bitmap.close?.();
       return result;
     } catch (_) {}
+
+    // If HEIC and createImageBitmap failed: try heic2any JS decoder
+    if (await isHeicFile(file)) {
+      try {
+        const heic2any = await loadHeic2any();
+        const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.92 });
+        const resultBlob = Array.isArray(blob) ? blob[0] : blob;
+        return new File([resultBlob], "image.jpg", { type: "image/jpeg" });
+      } catch (_) {}
+    }
 
     // Fallback: img tag → canvas
     return new Promise((resolve, reject) => {
@@ -219,7 +217,7 @@ export default function FormicaMatcher() {
         try { resolve(await drawAndExport(img, img.naturalWidth, img.naturalHeight)); }
         catch (e) { reject(e); }
       };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("image failed to load")); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("לא ניתן לטעון את התמונה. נסה לצלם ישירות עם כפתור 'צלם'.")); };
       img.src = url;
     });
   };
