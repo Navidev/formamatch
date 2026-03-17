@@ -65,16 +65,12 @@ export default function FormicaMatcher() {
     setError(null);
   }, []);
 
-  const handleAnalyze = async () => {
-    if (!fileObj) return;
+  const runLLM = async (promptText, fileUrl = null) => {
     setLoading(true);
     setError(null);
 
-    const { file_url } = await base44.integrations.Core.UploadFile({ file: fileObj });
-
-    const parsed = await base44.integrations.Core.InvokeLLM({
-      prompt: SYSTEM_PROMPT + "\n\nנתח את התמונה ומצא את ההתאמות הכי מדויקות מהרשימה. החזר JSON בלבד.",
-      file_urls: [file_url],
+    const params = {
+      prompt: promptText,
       model: "claude_sonnet_4_6",
       response_json_schema: {
         type: "object",
@@ -99,17 +95,61 @@ export default function FormicaMatcher() {
         },
         required: ["description", "color", "tone", "category", "warmth", "matches"],
       },
-    });
+    };
+    if (fileUrl) params.file_urls = [fileUrl];
 
+    const parsed = await base44.integrations.Core.InvokeLLM(params);
     setAnalysis(parsed);
 
-    // Map codes from AI response to full catalog entries
     const matched = (parsed.matches || []).map(m => {
       const entry = FORMICA_CATALOG.find(c => c.code === m.code);
       return entry ? { ...entry, reason: m.reason, similarity: m.similarity } : null;
     }).filter(Boolean);
     setResults(matched);
     setLoading(false);
+  };
+
+  const handleAnalyze = async () => {
+    if (!fileObj) return;
+    const { file_url } = await base44.integrations.Core.UploadFile({ file: fileObj });
+    await runLLM(SYSTEM_PROMPT + "\n\nנתח את התמונה ומצא את ההתאמות הכי מדויקות מהרשימה. החזר JSON בלבד.", file_url);
+  };
+
+  const handleTextSearch = async (query) => {
+    const textPrompt = `אתה מומחה להתאמת פורמייקה.
+
+להלן רשימת כל הפורמייקות הזמינות בפורמט: קוד|תיאור
+${CATALOG_FOR_PROMPT}
+
+המשתמש מחפש: "${query}"
+
+המשימה שלך:
+1. הבן מה המשתמש מחפש — צבע, סגנון, טקסטורה, גוון
+2. בחר את 6 הפורמייקות הכי מתאימות מהרשימה
+3. דרג לפי דמיון ל-${query}
+
+החזר JSON בלבד (ללא markdown):
+{
+  "description": "תיאור מה המשתמש מחפש",
+  "color": "שם הצבע בעברית",
+  "tone": "bright/medium/dark",
+  "category": "solid/wood/stone/metal/pattern",
+  "warmth": "warm/cool/neutral",
+  "matches": [
+    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 95},
+    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 88},
+    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 82},
+    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 75},
+    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 70},
+    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 65}
+  ]
+}
+
+חשוב: השתמש אך ורק בקודים שמופיעים ברשימה.`;
+
+    setAnalysis(null);
+    setResults([]);
+    await runLLM(textPrompt);
   };
 
   return (
