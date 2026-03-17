@@ -2,27 +2,41 @@ import { useState, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { motion, AnimatePresence } from "framer-motion";
 import { FORMICA_CATALOG } from "@/lib/formicaCatalog";
-import { matchFormica } from "@/lib/formicaMatch";
+import { CATALOG_FOR_PROMPT } from "@/lib/formicaCatalogPrompt";
 import UploadZone from "@/components/formica/UploadZone";
 import AnalysisPanel from "@/components/formica/AnalysisPanel";
 import ResultsGrid from "@/components/formica/ResultsGrid";
 import LoadingState from "@/components/formica/LoadingState";
 
-const SYSTEM_PROMPT = `You are an expert at matching formica materials. The user uploads an image of formica or a material they want to match.
+const SYSTEM_PROMPT = `אתה מומחה להתאמת פורמייקה עם ניסיון של 20 שנה.
+המשתמש מעלה תמונה של פורמייקה או חומר שהוא רוצה להתאים.
 
-Your task: Analyze the image and describe the visual characteristics in a structured way.
+להלן רשימת כל הפורמייקות הזמינות בפורמט: קוד|תיאור
+${CATALOG_FOR_PROMPT}
 
-Return JSON only (no markdown) with this structure:
+המשימה שלך:
+1. נתח לעומק את התמונה — צבע, גוון, טקסטורה, חום/קור, בהירות
+2. השווה ויזואלית לכל הפורמייקות ברשימה
+3. בחר את 6 הפורמייקות הכי קרובות ויזואלית
+
+החזר JSON בלבד (ללא markdown):
 {
-  "description": "Brief description of what you see (in Hebrew)",
-  "color": "main color name in English (e.g. grey, brown, oak, white, black, beige)",
+  "description": "תיאור מפורט של מה שרואים בתמונה",
+  "color": "שם הצבע הראשי בעברית",
   "tone": "bright/medium/dark",
   "category": "solid/wood/stone/metal/pattern",
   "warmth": "warm/cool/neutral",
-  "keywords": ["keyword1", "keyword2", "keyword3", "keyword4"]
+  "matches": [
+    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 95},
+    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 88},
+    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 82},
+    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 75},
+    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 70},
+    {"code": "XXXX XX", "reason": "סיבה קצרה בעברית", "similarity": 65}
+  ]
 }
 
-Keywords should be in English and match common material descriptors like: oak, walnut, marble, matte, glossy, grain, natural, rustic, modern, etc.`;
+חשוב: השתמש אך ורק בקודים שמופיעים ברשימה. similarity הוא אחוז דמיון 0-100.`;
 
 export default function FormicaMatcher() {
   const [image, setImage] = useState(null);
@@ -31,6 +45,7 @@ export default function FormicaMatcher() {
   const [results, setResults] = useState([]);
   const [error, setError] = useState(null);
   const [fileObj, setFileObj] = useState(null);
+  const [catalogCount] = useState(FORMICA_CATALOG.length);
 
   const handleFileSelect = useCallback((file) => {
     const url = URL.createObjectURL(file);
@@ -57,8 +72,9 @@ export default function FormicaMatcher() {
     const { file_url } = await base44.integrations.Core.UploadFile({ file: fileObj });
 
     const parsed = await base44.integrations.Core.InvokeLLM({
-      prompt: SYSTEM_PROMPT + "\n\nAnalyze the formica or material in the image and return JSON only.",
+      prompt: SYSTEM_PROMPT + "\n\nנתח את התמונה ומצא את ההתאמות הכי מדויקות מהרשימה. החזר JSON בלבד.",
       file_urls: [file_url],
+      model: "claude_sonnet_4_6",
       response_json_schema: {
         type: "object",
         properties: {
@@ -67,14 +83,31 @@ export default function FormicaMatcher() {
           tone: { type: "string", enum: ["bright", "medium", "dark"] },
           category: { type: "string", enum: ["solid", "wood", "stone", "metal", "pattern"] },
           warmth: { type: "string", enum: ["warm", "cool", "neutral"] },
-          keywords: { type: "array", items: { type: "string" } },
+          matches: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                code: { type: "string" },
+                reason: { type: "string" },
+                similarity: { type: "number" },
+              },
+              required: ["code", "reason", "similarity"],
+            },
+          },
         },
-        required: ["description", "color", "tone", "category", "warmth", "keywords"],
+        required: ["description", "color", "tone", "category", "warmth", "matches"],
       },
     });
 
     setAnalysis(parsed);
-    setResults(matchFormica(parsed));
+
+    // Map codes from AI response to full catalog entries
+    const matched = (parsed.matches || []).map(m => {
+      const entry = FORMICA_CATALOG.find(c => c.code === m.code);
+      return entry ? { ...entry, reason: m.reason, similarity: m.similarity } : null;
+    }).filter(Boolean);
+    setResults(matched);
     setLoading(false);
   };
 
