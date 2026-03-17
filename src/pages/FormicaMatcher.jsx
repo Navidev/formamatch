@@ -232,6 +232,7 @@ export default function FormicaMatcher() {
       let jpegFile = await toJpeg(fileObj);
       // Force type always
       jpegFile = new File([jpegFile], "image.jpg", { type: "image/jpeg" });
+      setError(null);
       const { file_url } = await base44.integrations.Core.UploadFile({ file: jpegFile });
 
       // Stage 1: text-based analysis → 12 candidates
