@@ -99,8 +99,9 @@ export default function FormicaMatcher() {
       };
       if (fileUrl) params.file_urls = [fileUrl];
 
-      const parsed = await base44.integrations.Core.InvokeLLM(params);
-      console.log("InvokeLLM result:", JSON.stringify(parsed).substring(0, 500));
+      const raw = await base44.integrations.Core.InvokeLLM(params);
+      console.log("InvokeLLM result:", JSON.stringify(raw).substring(0, 500));
+      const parsed = raw?.response || raw;
       setAnalysis(parsed);
 
       const matched = (parsed.matches || []).map(m => {
