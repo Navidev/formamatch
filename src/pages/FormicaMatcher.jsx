@@ -158,12 +158,14 @@ export default function FormicaMatcher() {
       const ctx = canvas.getContext("2d");
       if (!ctx) { reject(new Error("no canvas context")); return; }
       ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob(blob => {
-        if (blob && blob.size > 1000)
-          resolve(new File([blob], "image.jpg", { type: "image/jpeg" }));
-        else
-          reject(new Error("toBlob empty"));
-      }, "image/jpeg", 0.92);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+      const arr = dataUrl.split(",");
+      const bstr = atob(arr[1]);
+      const u8arr = new Uint8Array(bstr.length);
+      for (let i = 0; i < bstr.length; i++) u8arr[i] = bstr.charCodeAt(i);
+      const jpegFile = new File([u8arr], "image.jpg", { type: "image/jpeg" });
+      if (jpegFile.size > 100) resolve(jpegFile);
+      else reject(new Error("toDataURL empty"));
     });
 
     // Always use FileReader → img → canvas (handles HEIC, JPEG, PNG on iOS)
