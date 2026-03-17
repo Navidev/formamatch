@@ -232,6 +232,8 @@ export default function FormicaMatcher() {
       let jpegFile = await toJpeg(fileObj);
       // Force type always
       jpegFile = new File([jpegFile], "image.jpg", { type: "image/jpeg" });
+      setError(`📁 קובץ: ${jpegFile.name} | סוג: "${jpegFile.type}" | גודל: ${jpegFile.size} bytes`);
+      await new Promise(r => setTimeout(r, 2000)); // הצג 2 שניות
       setError(null);
       const { file_url } = await base44.integrations.Core.UploadFile({ file: jpegFile });
 
