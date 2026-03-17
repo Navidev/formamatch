@@ -10,7 +10,8 @@ export default function UploadZone({ image, onFileSelect, onAnalyze, onReset, lo
   const processFile = useCallback((file) => {
     console.log("processFile:", file?.name, "type:", file?.type, "size:", file?.size);
     if (!file) return;
-    const isImage = file.type.startsWith("image/") || file.name?.match(/\.(jpe?g|png|webp|heic|heif)$/i);
+    // On iPhone, HEIC files often have empty type — allow all files from the picker
+    const isImage = file.type.startsWith("image/") || file.name?.match(/\.(jpe?g|png|webp|heic|heif)$/i) || file.type === "";
     if (!isImage) return;
     onFileSelect(file);
   }, [onFileSelect]);
